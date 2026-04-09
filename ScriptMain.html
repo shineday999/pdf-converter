@@ -112,13 +112,7 @@ function updateFileListVisibility() {
   document.getElementById('fileListEmpty').style.display   = hasFiles ? 'none' : '';
 }
 
-/* ── Modal 工具 ── */
-function showProgress(title, step, pct, detail, queue) {
-  document.getElementById('progressFileName').textContent = title || '處理中…';
-  document.getElementById('progressStep').textContent     = step  || '';
-  document.getElementById('progressBar').style.width      = (pct || 0) + '%';
-  document.getElementById('progressDetail').textContent   = detail || '';
-  document.getElementById('progressQueue').textContent    = queue  || '';
+function showProgress() {
   var m = bootstrap.Modal.getOrCreateInstance(document.getElementById('progressModal'));
   m.show();
 }
@@ -186,29 +180,11 @@ async function startConversion() {
         var fmt = formats[fmtIdx];
         var overallPct = Math.round(((fi * formats.length + fmtIdx) / (totalFiles * formats.length)) * 80);
 
-        showProgress(
-          entry.file.name,
-          '本機轉換中：' + fmt.toUpperCase() + '…',
-          overallPct,
-          '',
-          '檔案 ' + (fi+1) + '/' + totalFiles + ' · 格式 ' + (fmtIdx+1) + '/' + formats.length
-        );
+        showProgress();
 
-        var converted = await runConverter(entry.file, fmt, dpi, pageRange, function(pct) {
-          document.getElementById('progressBar').style.width =
-            (overallPct + Math.round(pct * 0.15)) + '%';
-          document.getElementById('progressDetail').textContent = pct + '%';
-        });
+        var converted = await runConverter(entry.file, fmt, dpi, pageRange, function() {});
 
         // 上傳至 Drive
-        showProgress(
-          entry.file.name,
-          '上傳至 Google Drive：' + fmt.toUpperCase() + '…',
-          overallPct + 15,
-          '',
-          '檔案 ' + (fi+1) + '/' + totalFiles
-        );
-
         var driveFiles = await uploadConverted(converted, fmt, baseName, folderId);
         driveFilesThisPdf = driveFilesThisPdf.concat(driveFiles);
         allDriveFiles = allDriveFiles.concat(driveFiles);
@@ -222,7 +198,7 @@ async function startConversion() {
     }
 
     // 寄送 Email
-    showProgress('寄送 Email…', '透過 GmailApp 傳送轉換結果', 90, '', '');
+    showProgress();
 
     var emailResult = await new Promise(function(resolve) {
       google.script.run
@@ -323,24 +299,13 @@ async function uploadConverted(converted, fmt, baseName, folderId) {
 
 /* ── 結果 Modal 內容 ── */
 function buildResultHtml(results) {
-  var rows = '';
-  results.forEach(function(r) {
-    r.driveFiles.forEach(function(f) {
-      var sizeStr = f.size < 1024*1024
-        ? (f.size/1024).toFixed(1) + ' KB'
-        : (f.size/1024/1024).toFixed(2) + ' MB';
-      rows += '<tr>' +
-        '<td>' + r.sourceName + '</td>' +
-        '<td><a href="' + f.webViewLink + '" target="_blank">' + f.fileName + '</a></td>' +
-        '<td>' + sizeStr + '</td>' +
-        '<td><span class="badge-ok"><i class="bi bi-check-lg me-1"></i>完成</span></td>' +
-      '</tr>';
-    });
-  });
-
-  return '<table class="result-table">' +
-    '<thead><tr><th>來源檔案</th><th>輸出檔案</th><th>大小</th><th>狀態</th></tr></thead>' +
-    '<tbody>' + rows + '</tbody></table>';
+  var totalFiles = 0;
+  results.forEach(function(r) { totalFiles += r.driveFiles.length; });
+  return '<div class="text-center py-3">' +
+    '<i class="bi bi-check-circle-fill" style="font-size:40px;color:#10B981;"></i>' +
+    '<p style="margin:12px 0 4px;font-weight:600;color:#1A1F36;font-size:15px;">轉換完成</p>' +
+    '<p style="color:#6B7280;font-size:13px;">共 ' + results.length + ' 個檔案，' + totalFiles + ' 個輸出結果</p>' +
+    '</div>';
 }
 
 function buildEmailInfo(emailResult, email) {

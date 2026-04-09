@@ -211,25 +211,15 @@
 
   <!-- 進度 Modal -->
   <div class="modal fade" id="progressModal" data-bs-backdrop="static" data-bs-keyboard="false"
-       tabindex="-1" aria-labelledby="progressModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content sabre-modal">
-        <div class="modal-header sabre-modal-header">
-          <h5 class="modal-title" id="progressModalLabel">
-            <i class="bi bi-arrow-repeat spin me-2"></i>轉換處理中
-          </h5>
-        </div>
-        <div class="modal-body">
-          <div class="progress-file-name" id="progressFileName">準備中...</div>
-          <div class="progress-step" id="progressStep"></div>
-          <div class="progress mt-2" style="height:10px;border-radius:999px;">
-            <div class="progress-bar progress-bar-striped progress-bar-animated"
-                 id="progressBar" role="progressbar"
-                 style="width:0%;background:linear-gradient(90deg,#FF6B00,#FF8C38)">
-            </div>
+       tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content sabre-modal" style="border-radius:16px;">
+        <div class="modal-body text-center py-4">
+          <div class="spinner-border" role="status"
+               style="color:var(--sabre-orange);width:2.5rem;height:2.5rem;border-width:3px;">
+            <span class="visually-hidden">處理中</span>
           </div>
-          <div class="progress-detail" id="progressDetail"></div>
-          <div class="progress-queue" id="progressQueue"></div>
+          <p style="margin:14px 0 0;font-size:13px;color:#6B7280;font-weight:500;">處理中，請稍候…</p>
         </div>
       </div>
     </div>
