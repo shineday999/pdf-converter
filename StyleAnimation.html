@@ -1,0 +1,78 @@
+<style>
+/* ═══════════════════════════════════════
+   Micro Animations
+   ═══════════════════════════════════════ */
+
+/* ── Spin for loading ── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+
+/* ── Compass idle wobble ── */
+@keyframes compassWobble {
+  0%,100% { transform: rotate(0deg); }
+  25%      { transform: rotate(8deg); }
+  75%      { transform: rotate(-8deg); }
+}
+.navbar-compass i {
+  animation: compassWobble 4s ease-in-out infinite;
+  display: inline-block;
+}
+
+/* ── Dropzone pulse when dragging over ── */
+@keyframes dzonePulse {
+  0%,100% { box-shadow: 0 0 0 0 var(--sabre-orange-glow); }
+  50%      { box-shadow: 0 0 0 6px var(--sabre-orange-glow); }
+}
+.dropzone.dragover { animation: dzonePulse 1s ease-in-out infinite; }
+
+/* ── Format card pop on activation ── */
+@keyframes cardPop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.format-card.pop { animation: cardPop 0.2s ease; }
+
+/* ── File item slide-in ── */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.file-item { animation: slideIn 0.18s ease; }
+
+/* ── Button shimmer on hover ── */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.btn-convert:hover:not(:disabled) {
+  background-size: 200% auto;
+  animation: shimmer 1.2s linear infinite;
+  background-image: linear-gradient(90deg, var(--sabre-orange), #FF8C38, var(--sabre-orange));
+}
+
+/* ── Progress bar glow ── */
+@keyframes barGlow {
+  0%,100% { box-shadow: 0 0 4px var(--sabre-orange-glow); }
+  50%      { box-shadow: 0 0 12px rgba(255,107,0,0.4); }
+}
+#progressBar { animation: barGlow 1.5s ease-in-out infinite; }
+
+/* ── Success checkmark bounce ── */
+@keyframes checkBounce {
+  0%   { transform: scale(0); }
+  60%  { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+.badge-ok { animation: checkBounce 0.3s ease; }
+
+/* ── Fade in page ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.sabre-main { animation: fadeIn 0.3s ease; }
+</style>

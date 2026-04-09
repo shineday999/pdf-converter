@@ -1,0 +1,372 @@
+<script>
+/* ═══════════════════════════════════════
+   ScriptMain.html
+   主流程：狀態管理、檔案清單、轉換排程、
+   google.script.run 串接、Modal 控制
+   ═══════════════════════════════════════ */
+
+/* ── 應用狀態 ── */
+var AppState = {
+  files: [],        // [{file, selected, pageCount, id}]
+  results: [],      // 本次轉換結果
+  busy: false
+};
+
+/* ── 檔案管理 ── */
+function addFiles(newFiles) {
+  newFiles.filter(function(f) { return f.type === 'application/pdf'; })
+    .forEach(function(f) {
+      var id = 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      AppState.files.push({ file: f, selected: true, pageCount: '…', id: id });
+      renderFileItem(AppState.files[AppState.files.length - 1]);
+      loadPageCount(AppState.files[AppState.files.length - 1]);
+    });
+
+  var nonPdf = newFiles.filter(function(f) { return f.type !== 'application/pdf'; });
+  if (nonPdf.length) showError('請只選擇 PDF 檔案。\n已忽略 ' + nonPdf.length + ' 個非 PDF 檔案。');
+
+  updateFileListVisibility();
+  validateForm();
+}
+
+async function loadPageCount(entry) {
+  try {
+    var pdfjs = await getPdfLib();
+    var ab = await entry.file.arrayBuffer();
+    var doc = await pdfjs.getDocument({ data: ab }).promise;
+    entry.pageCount = doc.numPages;
+    var el = document.querySelector('[data-fileid="' + entry.id + '"] .file-item-meta');
+    if (el) el.textContent = doc.numPages + ' 頁 | ' + formatFileSize(entry.file.size);
+  } catch(e) { /* 靜默忽略 */ }
+}
+
+function renderFileItem(entry) {
+  var list = document.getElementById('fileList');
+  var div = document.createElement('div');
+  div.className = 'file-item' + (entry.selected ? ' selected' : '');
+  div.setAttribute('role', 'listitem');
+  div.dataset.fileid = entry.id;
+  div.innerHTML =
+    '<span class="file-item-check">' + (entry.selected ? '<i class="bi bi-check-lg"></i>' : '') + '</span>' +
+    '<i class="bi bi-file-earmark-pdf file-item-icon"></i>' +
+    '<div class="file-item-info">' +
+      '<div class="file-item-name" title="' + entry.file.name + '">' + entry.file.name + '</div>' +
+      '<div class="file-item-meta">載入中… | ' + formatFileSize(entry.file.size) + '</div>' +
+    '</div>' +
+    '<button class="file-item-remove" title="移除" aria-label="移除 ' + entry.file.name + '">' +
+      '<i class="bi bi-x-lg"></i>' +
+    '</button>';
+
+  div.querySelector('.file-item-remove').addEventListener('click', function(e) {
+    e.stopPropagation();
+    removeFile(entry.id);
+  });
+  div.addEventListener('click', function(e) {
+    if (e.target.closest('.file-item-remove')) return;
+    toggleFileSelect(entry.id);
+  });
+
+  list.appendChild(div);
+}
+
+function toggleFileSelect(id) {
+  var entry = AppState.files.find(function(f) { return f.id === id; });
+  if (!entry) return;
+  entry.selected = !entry.selected;
+  var el = document.querySelector('[data-fileid="' + id + '"]');
+  if (el) {
+    el.classList.toggle('selected', entry.selected);
+    var chk = el.querySelector('.file-item-check');
+    chk.innerHTML = entry.selected ? '<i class="bi bi-check-lg"></i>' : '';
+  }
+  validateForm();
+}
+
+function removeFile(id) {
+  AppState.files = AppState.files.filter(function(f) { return f.id !== id; });
+  var el = document.querySelector('[data-fileid="' + id + '"]');
+  if (el) el.remove();
+  updateFileListVisibility();
+  validateForm();
+}
+
+function selectAllFiles() {
+  AppState.files.forEach(function(f) { f.selected = true; });
+  document.querySelectorAll('.file-item').forEach(function(el) {
+    el.classList.add('selected');
+    el.querySelector('.file-item-check').innerHTML = '<i class="bi bi-check-lg"></i>';
+  });
+  validateForm();
+}
+
+function clearAllFiles() {
+  AppState.files = [];
+  document.getElementById('fileList').innerHTML = '';
+  updateFileListVisibility();
+  validateForm();
+}
+
+function updateFileListVisibility() {
+  var hasFiles = AppState.files.length > 0;
+  document.getElementById('fileListSection').style.display = hasFiles ? '' : 'none';
+  document.getElementById('fileListEmpty').style.display   = hasFiles ? 'none' : '';
+}
+
+/* ── Modal 工具 ── */
+function showProgress(title, step, pct, detail, queue) {
+  document.getElementById('progressFileName').textContent = title || '處理中…';
+  document.getElementById('progressStep').textContent     = step  || '';
+  document.getElementById('progressBar').style.width      = (pct || 0) + '%';
+  document.getElementById('progressDetail').textContent   = detail || '';
+  document.getElementById('progressQueue').textContent    = queue  || '';
+  var m = bootstrap.Modal.getOrCreateInstance(document.getElementById('progressModal'));
+  m.show();
+}
+function hideProgress() {
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('progressModal')).hide();
+}
+function showResult(bodyHtml, emailInfo) {
+  document.getElementById('resultModalBody').innerHTML  = bodyHtml;
+  document.getElementById('resultEmailInfo').innerHTML  = emailInfo || '';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('resultModal')).show();
+}
+function showError(msg) {
+  document.getElementById('errorModalBody').innerHTML =
+    '<div class="alert alert-danger mb-0" style="font-size:13px;">' +
+    '<i class="bi bi-exclamation-triangle-fill me-2"></i>' + msg + '</div>';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('errorModal')).show();
+}
+
+/* ── 主轉換流程 ── */
+document.getElementById('btnConvert').addEventListener('click', startConversion);
+
+async function startConversion() {
+  if (AppState.busy) return;
+
+  var selectedFiles = AppState.files.filter(function(f) { return f.selected; });
+  var formats  = getSelectedFormats();
+  var dpi      = getSelectedDpi();
+  var pageRange = getPageRange();
+  var email     = document.getElementById('recipientEmail').value.trim();
+
+  if (!selectedFiles.length || !formats.length || !isValidEmail(email)) return;
+
+  AppState.busy = true;
+  AppState.results = [];
+  var startTime = Date.now();
+  var totalFiles = selectedFiles.length;
+  var allDriveFiles = [];
+  var firstFolderId = null;
+
+  try {
+    for (var fi = 0; fi < totalFiles; fi++) {
+      var entry = selectedFiles[fi];
+      var baseName = getBaseName(entry.file.name);
+
+      // 建立 Drive 資料夾（每個 PDF 一個）
+      showProgress(
+        entry.file.name,
+        '建立 Google Drive 資料夾…',
+        0,
+        '',
+        '檔案 ' + (fi+1) + ' / ' + totalFiles
+      );
+
+      var folderId = await new Promise(function(resolve, reject) {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .createOutputFolder(baseName);
+      });
+
+      if (fi === 0) firstFolderId = folderId;
+      var driveFilesThisPdf = [];
+
+      for (var fmtIdx = 0; fmtIdx < formats.length; fmtIdx++) {
+        var fmt = formats[fmtIdx];
+        var overallPct = Math.round(((fi * formats.length + fmtIdx) / (totalFiles * formats.length)) * 80);
+
+        showProgress(
+          entry.file.name,
+          '本機轉換中：' + fmt.toUpperCase() + '…',
+          overallPct,
+          '',
+          '檔案 ' + (fi+1) + '/' + totalFiles + ' · 格式 ' + (fmtIdx+1) + '/' + formats.length
+        );
+
+        var converted = await runConverter(entry.file, fmt, dpi, pageRange, function(pct) {
+          document.getElementById('progressBar').style.width =
+            (overallPct + Math.round(pct * 0.15)) + '%';
+          document.getElementById('progressDetail').textContent = pct + '%';
+        });
+
+        // 上傳至 Drive
+        showProgress(
+          entry.file.name,
+          '上傳至 Google Drive：' + fmt.toUpperCase() + '…',
+          overallPct + 15,
+          '',
+          '檔案 ' + (fi+1) + '/' + totalFiles
+        );
+
+        var driveFiles = await uploadConverted(converted, fmt, baseName, folderId);
+        driveFilesThisPdf = driveFilesThisPdf.concat(driveFiles);
+        allDriveFiles = allDriveFiles.concat(driveFiles);
+      }
+
+      AppState.results.push({
+        sourceName: entry.file.name,
+        folderId: folderId,
+        driveFiles: driveFilesThisPdf
+      });
+    }
+
+    // 寄送 Email
+    showProgress('寄送 Email…', '透過 GmailApp 傳送轉換結果', 90, '', '');
+
+    var emailResult = await new Promise(function(resolve) {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(function(e) { resolve({ success: false, message: e.message }); })
+        .sendConversionResult(
+          email,
+          allDriveFiles,
+          selectedFiles.map(function(f){return f.file.name;}).join(', '),
+          firstFolderId
+        );
+    });
+
+    // 靜默記錄
+    var durationSec = Math.round((Date.now() - startTime) / 1000);
+    google.script.run.logConversion({
+      fileNames: selectedFiles.map(function(f){return f.file.name;}),
+      formats: formats,
+      dpi: dpi,
+      pageRange: pageRange,
+      totalPages: allDriveFiles.length,
+      outputSizeKb: Math.round(allDriveFiles.reduce(function(s,f){return s+(f.size||0);},0)/1024),
+      recipientEmail: email,
+      status: 'success',
+      durationSeconds: durationSec
+    });
+
+    hideProgress();
+    showResult(buildResultHtml(AppState.results), buildEmailInfo(emailResult, email));
+
+  } catch (err) {
+    // 記錄錯誤
+    google.script.run.logConversion({
+      fileNames: selectedFiles.map(function(f){return f.file.name;}),
+      formats: formats, dpi: dpi, pageRange: pageRange,
+      status: 'error', errorMessage: err.message || String(err),
+      durationSeconds: Math.round((Date.now() - startTime) / 1000)
+    });
+
+    hideProgress();
+    showError('轉換過程發生錯誤：<br>' + (err.message || String(err)));
+  } finally {
+    AppState.busy = false;
+    setStatus('就緒', '', 'ready');
+  }
+}
+
+/* ── 執行對應轉換器 ── */
+async function runConverter(file, fmt, dpi, pageRange, onProgress) {
+  var opts = { pageRange: pageRange, onProgress: onProgress, dpi: dpi, format: fmt };
+  switch(fmt) {
+    case 'txt':  return { type: 'single', blob: await convertToTxt(file, opts),   ext: 'txt' };
+    case 'png':  return { type: 'multi',  pages: await convertToImage(file, opts), ext: 'png' };
+    case 'jpg':  return { type: 'multi',  pages: await convertToImage(file, opts), ext: 'jpg' };
+    case 'docx': return { type: 'single', blob: await convertToDocx(file, opts),  ext: 'docx' };
+    case 'xlsx': return { type: 'single', blob: await convertToXlsx(file, opts),  ext: 'xlsx' };
+    case 'html': return { type: 'single', blob: await convertToHtml(file, opts),  ext: 'html' };
+    case 'csv':  return { type: 'single', blob: await convertToCsv(file, opts),   ext: 'csv' };
+    default: throw new Error('不支援的格式：' + fmt);
+  }
+}
+
+/* ── 上傳轉換結果至 Drive（分批以避免 50MB 限制）── */
+async function uploadConverted(converted, fmt, baseName, folderId) {
+  var fileEntries = [];
+
+  if (converted.type === 'single') {
+    var b64 = await blobToBase64(converted.blob);
+    fileEntries.push({ base64: b64, name: baseName + '.' + converted.ext, mime: getMime(converted.ext) });
+  } else {
+    // 多頁圖片：每 5 頁一批
+    var BATCH = 5;
+    var pages = converted.pages;
+    for (var i = 0; i < pages.length; i += BATCH) {
+      var batch = pages.slice(i, i + BATCH);
+      for (var j = 0; j < batch.length; j++) {
+        var b64 = await blobToBase64(batch[j].blob);
+        fileEntries.push({ base64: b64, name: batch[j].name, mime: getMime(converted.ext) });
+      }
+    }
+  }
+
+  // 分批上傳
+  var results = [];
+  var UPLOAD_BATCH = 3;
+  for (var i = 0; i < fileEntries.length; i += UPLOAD_BATCH) {
+    var batch = fileEntries.slice(i, i + UPLOAD_BATCH);
+    var batchResult = await new Promise(function(resolve, reject) {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        .saveFilesToDrive(batch, folderId);
+    });
+    results = results.concat(batchResult);
+  }
+  return results;
+}
+
+/* ── 結果 Modal 內容 ── */
+function buildResultHtml(results) {
+  var rows = '';
+  results.forEach(function(r) {
+    r.driveFiles.forEach(function(f) {
+      var sizeStr = f.size < 1024*1024
+        ? (f.size/1024).toFixed(1) + ' KB'
+        : (f.size/1024/1024).toFixed(2) + ' MB';
+      rows += '<tr>' +
+        '<td>' + r.sourceName + '</td>' +
+        '<td><a href="' + f.webViewLink + '" target="_blank">' + f.fileName + '</a></td>' +
+        '<td>' + sizeStr + '</td>' +
+        '<td><span class="badge-ok"><i class="bi bi-check-lg me-1"></i>完成</span></td>' +
+      '</tr>';
+    });
+  });
+
+  return '<table class="result-table">' +
+    '<thead><tr><th>來源檔案</th><th>輸出檔案</th><th>大小</th><th>狀態</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>';
+}
+
+function buildEmailInfo(emailResult, email) {
+  if (emailResult && emailResult.success) {
+    return '<i class="bi bi-envelope-check-fill"></i> Email 已寄送至 <strong>' + email + '</strong>';
+  }
+  return '<i class="bi bi-envelope-exclamation text-warning"></i> Email 寄送失敗：' +
+    (emailResult ? emailResult.message : '未知錯誤');
+}
+
+/* ── 初始化 ── */
+(function init() {
+  initDropzone();
+  initFormatGrid();
+  initPageRange();
+  initEmailInput();
+  updateFileListVisibility();
+
+  // 預填收件人（從 GAS session 取得）
+  if (typeof google !== 'undefined' && google.script) {
+    google.script.run
+      .withSuccessHandler(function(email) {
+        if (email) document.getElementById('recipientEmail').value = email;
+        validateForm();
+      })
+      .getCurrentUserEmail();
+  }
+})();
+</script>

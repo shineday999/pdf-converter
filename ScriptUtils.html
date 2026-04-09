@@ -1,0 +1,89 @@
+<script>
+/* ═══════════════════════════════════════
+   ScriptUtils.html
+   工具函式：Base64、格式化、JSZip、下載
+   ═══════════════════════════════════════ */
+
+/** ArrayBuffer → Base64 string */
+function arrayBufferToBase64(buffer) {
+  var bytes = new Uint8Array(buffer);
+  var binary = '';
+  for (var i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+/** Blob → Base64 string (Promise) */
+function blobToBase64(blob) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function() { resolve(reader.result.split(',')[1]); };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** 格式化檔案大小 */
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+/** 解析頁碼範圍字串 (e.g. "1-3,5,7-9") → number[] (1-indexed) */
+function parsePageRange(str, maxPage) {
+  if (!str || str.trim() === '') return null; // null = 全部
+  var pages = new Set();
+  str.split(',').forEach(function(part) {
+    part = part.trim();
+    var m = part.match(/^(\d+)-(\d+)$/);
+    if (m) {
+      for (var i = parseInt(m[1]); i <= parseInt(m[2]); i++) {
+        if (i >= 1 && i <= maxPage) pages.add(i);
+      }
+    } else {
+      var n = parseInt(part);
+      if (!isNaN(n) && n >= 1 && n <= maxPage) pages.add(n);
+    }
+  });
+  return pages.size ? Array.from(pages).sort(function(a,b){return a-b;}) : null;
+}
+
+/** 多個 Blob 打包成 ZIP (Promise → Blob) */
+async function packToZip(fileEntries) {
+  // fileEntries: [{name, blob}, ...]
+  var zip = new JSZip();
+  fileEntries.forEach(function(e) { zip.file(e.name, e.blob); });
+  return await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+}
+
+/** 觸發瀏覽器下載 */
+function triggerDownload(blob, filename) {
+  saveAs(blob, filename);
+}
+
+/** 取得副檔名對應 MIME */
+function getMime(ext) {
+  var map = {
+    txt:  'text/plain',
+    png:  'image/png',
+    jpg:  'image/jpeg',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    html: 'text/html',
+    csv:  'text/csv',
+    zip:  'application/zip'
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
+/** 驗證 email 格式 */
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+/** 取得無副檔名的檔名 */
+function getBaseName(filename) {
+  return filename.replace(/\.[^/.]+$/, '');
+}
+</script>

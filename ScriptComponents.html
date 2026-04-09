@@ -1,0 +1,121 @@
+<script>
+/* ═══════════════════════════════════════
+   ScriptComponents.html
+   UI 元件：Dropzone、格式選擇、檔案清單
+   ═══════════════════════════════════════ */
+
+/* ── 狀態更新 ── */
+function setStatus(text, detail, type) {
+  var dot = document.getElementById('statusText');
+  var det = document.getElementById('statusDetail');
+  var cls = 'status-' + (type || 'ready');
+  dot.innerHTML = '<i class="bi bi-circle-fill status-dot ' + cls + '"></i>' + text;
+  det.textContent = detail || '';
+}
+
+/* ── Dropzone 初始化 ── */
+function initDropzone() {
+  var dz = document.getElementById('dropzone');
+  var input = document.getElementById('fileInput');
+
+  dz.addEventListener('click', function() { input.click(); });
+  dz.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+  });
+
+  dz.addEventListener('dragover', function(e) {
+    e.preventDefault(); dz.classList.add('dragover');
+  });
+  dz.addEventListener('dragleave', function() { dz.classList.remove('dragover'); });
+  dz.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dz.classList.remove('dragover');
+    addFiles(Array.from(e.dataTransfer.files));
+  });
+
+  input.addEventListener('change', function() {
+    addFiles(Array.from(input.files));
+    input.value = '';
+  });
+
+  document.getElementById('btnSelectAll').addEventListener('click', selectAllFiles);
+  document.getElementById('btnClearAll').addEventListener('click', clearAllFiles);
+}
+
+/* ── 格式選擇初始化 ── */
+function initFormatGrid() {
+  document.querySelectorAll('.format-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      card.classList.toggle('active');
+      card.setAttribute('aria-pressed', card.classList.contains('active'));
+      card.classList.add('pop');
+      card.addEventListener('animationend', function() { card.classList.remove('pop'); }, { once: true });
+      updateDpiVisibility();
+      validateForm();
+    });
+  });
+}
+
+function updateDpiVisibility() {
+  var hasImg = ['png','jpg'].some(function(f) {
+    var el = document.getElementById('fmt-' + f);
+    return el && el.classList.contains('active');
+  });
+  var sec = document.getElementById('dpiSection');
+  sec.style.display = hasImg ? '' : 'none';
+}
+
+function getSelectedFormats() {
+  return Array.from(document.querySelectorAll('.format-card.active'))
+    .map(function(c) { return c.dataset.format; });
+}
+
+function getSelectedDpi() {
+  var r = document.querySelector('input[name="dpi"]:checked');
+  return r ? parseInt(r.value) : 300;
+}
+
+function getPageRange() {
+  var custom = document.getElementById('pageCustom');
+  if (custom && custom.checked) {
+    return document.getElementById('pageRangeInput').value.trim() || 'all';
+  }
+  return 'all';
+}
+
+/* ── 頁碼範圍切換 ── */
+function initPageRange() {
+  document.getElementById('pageAll').addEventListener('change', function() {
+    document.getElementById('pageRangeInput').disabled = true;
+    document.getElementById('pageAllLabel').querySelector('.radio-box').style.setProperty('--highlight','');
+  });
+  document.getElementById('pageCustom').addEventListener('change', function() {
+    var inp = document.getElementById('pageRangeInput');
+    inp.disabled = false;
+    inp.focus();
+  });
+}
+
+/* ── Email Input ── */
+function initEmailInput() {
+  document.getElementById('recipientEmail').addEventListener('input', validateForm);
+}
+
+/* ── 表單驗證：啟用/停用轉換按鈕 ── */
+function validateForm() {
+  var hasFiles = AppState.files.some(function(f) { return f.selected; });
+  var hasFormat = getSelectedFormats().length > 0;
+  var hasEmail = isValidEmail(document.getElementById('recipientEmail').value.trim());
+
+  document.getElementById('btnConvert').disabled = !(hasFiles && hasFormat && hasEmail);
+
+  // 更新狀態列
+  var selCount = AppState.files.filter(function(f){ return f.selected; }).length;
+  if (selCount > 0 || hasFormat) {
+    var detail = selCount + ' 個檔案';
+    var fmts = getSelectedFormats();
+    if (fmts.length) detail += ' | 格式: ' + fmts.map(function(f){return f.toUpperCase();}).join(', ');
+    setStatus('就緒', detail, 'ready');
+  }
+}
+</script>

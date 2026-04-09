@@ -1,0 +1,314 @@
+<script>
+/* ═══════════════════════════════════════
+   ScriptConverters.html
+   7 個 PDF 轉換器（全部本機執行，零上傳）
+   依賴：pdf.js (pdfjsLib), docx, XLSX, JSZip, Utils
+   ═══════════════════════════════════════ */
+
+/* ── pdf.js 初始化（CDN ES module 模式需動態 import）── */
+var _pdfLib = null;
+async function getPdfLib() {
+  if (_pdfLib) return _pdfLib;
+  // pdf.js 4.x CDN mjs
+  var mod = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.mjs');
+  mod.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.mjs';
+  _pdfLib = mod;
+  return _pdfLib;
+}
+
+/**
+ * 載入 PDF 文件
+ * @param {File} file
+ * @returns {Promise<PDFDocumentProxy>}
+ */
+async function loadPdf(file) {
+  var pdfjs = await getPdfLib();
+  var ab = await file.arrayBuffer();
+  return await pdfjs.getDocument({ data: ab }).promise;
+}
+
+/**
+ * 取得要處理的頁碼陣列
+ * @param {PDFDocumentProxy} doc
+ * @param {string} pageRangeStr  '' | 'all' | '1-3,5'
+ * @returns {number[]} 1-indexed
+ */
+function getPageNumbers(doc, pageRangeStr) {
+  if (!pageRangeStr || pageRangeStr === 'all') {
+    return Array.from({ length: doc.numPages }, function(_, i) { return i + 1; });
+  }
+  var parsed = parsePageRange(pageRangeStr, doc.numPages);
+  return parsed || Array.from({ length: doc.numPages }, function(_, i) { return i + 1; });
+}
+
+/* ════════════════════════════════
+   1. PDF → TXT
+   ════════════════════════════════ */
+/**
+ * @param {File} file
+ * @param {{pageRange:string, onProgress:function}} opts
+ * @returns {Promise<Blob>}
+ */
+async function convertToTxt(file, opts) {
+  opts = opts || {};
+  var doc = await loadPdf(file);
+  var pages = getPageNumbers(doc, opts.pageRange);
+  var parts = [];
+
+  for (var i = 0; i < pages.length; i++) {
+    var pageNum = pages[i];
+    var page = await doc.getPage(pageNum);
+    var content = await page.getTextContent();
+    var text = content.items
+      .map(function(item) { return item.str; })
+      .join(' ');
+    parts.push('--- 第 ' + pageNum + ' 頁 ---\n' + text);
+    if (opts.onProgress) opts.onProgress(Math.round((i + 1) / pages.length * 100));
+  }
+
+  return new Blob([parts.join('\n\n')], { type: 'text/plain;charset=utf-8' });
+}
+
+/* ════════════════════════════════
+   2. PDF → PNG  3. PDF → JPG
+   ════════════════════════════════ */
+/**
+ * @param {File} file
+ * @param {{format:'png'|'jpg', dpi:number, pageRange:string, onProgress:function}} opts
+ * @returns {Promise<Array<{name:string, blob:Blob}>>}  每頁一個
+ */
+async function convertToImage(file, opts) {
+  opts = opts || {};
+  var format = opts.format || 'png';
+  var dpi = opts.dpi || 300;
+  var scale = dpi / 72; // pdf.js 預設 72 DPI
+
+  var doc = await loadPdf(file);
+  var pages = getPageNumbers(doc, opts.pageRange);
+  var baseName = getBaseName(file.name);
+  var results = [];
+
+  var canvas = document.createElement('canvas');
+  var ctx = canvas.getContext('2d');
+
+  for (var i = 0; i < pages.length; i++) {
+    var pageNum = pages[i];
+    var page = await doc.getPage(pageNum);
+    var viewport = page.getViewport({ scale: scale });
+
+    canvas.width  = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+
+    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+    var mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+    var quality  = format === 'jpg' ? 0.92 : undefined;
+    var blob = await new Promise(function(resolve) {
+      canvas.toBlob(resolve, mimeType, quality);
+    });
+
+    var paddedNum = String(pageNum).padStart(3, '0');
+    results.push({
+      name: baseName + '_p' + paddedNum + '.' + format,
+      blob: blob
+    });
+
+    if (opts.onProgress) opts.onProgress(Math.round((i + 1) / pages.length * 100));
+  }
+
+  return results; // 多頁 → 呼叫端決定是否 ZIP
+}
+
+/* ════════════════════════════════
+   4. PDF → DOCX
+   ════════════════════════════════ */
+/**
+ * @param {File} file
+ * @param {{pageRange:string, onProgress:function}} opts
+ * @returns {Promise<Blob>}
+ */
+async function convertToDocx(file, opts) {
+  opts = opts || {};
+  var doc = await loadPdf(file);
+  var pages = getPageNumbers(doc, opts.pageRange);
+  var children = [];
+
+  for (var i = 0; i < pages.length; i++) {
+    var pageNum = pages[i];
+    var page = await doc.getPage(pageNum);
+    var content = await page.getTextContent();
+
+    // 頁首
+    children.push(new docx.Paragraph({
+      text: '── 第 ' + pageNum + ' 頁 ──',
+      heading: docx.HeadingLevel.HEADING_2,
+      spacing: { before: 200, after: 100 }
+    }));
+
+    // 以行為單位群組文字
+    var lines = {};
+    content.items.forEach(function(item) {
+      var y = Math.round(item.transform[5]);
+      if (!lines[y]) lines[y] = [];
+      lines[y].push(item.str);
+    });
+
+    Object.keys(lines).sort(function(a,b){return b-a;}).forEach(function(y) {
+      var lineText = lines[y].join(' ').trim();
+      if (lineText) {
+        children.push(new docx.Paragraph({
+          children: [new docx.TextRun({ text: lineText, size: 22 })],
+          spacing: { after: 60 }
+        }));
+      }
+    });
+
+    if (opts.onProgress) opts.onProgress(Math.round((i + 1) / pages.length * 100));
+  }
+
+  var wordDoc = new docx.Document({
+    creator: 'Sabre PDF Converter',
+    title: getBaseName(file.name),
+    sections: [{ properties: {}, children: children }]
+  });
+
+  var buffer = await docx.Packer.toBuffer(wordDoc);
+  return new Blob([buffer], { type: getMime('docx') });
+}
+
+/* ════════════════════════════════
+   5. PDF → XLSX
+   ════════════════════════════════ */
+/**
+ * @param {File} file
+ * @param {{pageRange:string, onProgress:function}} opts
+ * @returns {Promise<Blob>}
+ */
+async function convertToXlsx(file, opts) {
+  opts = opts || {};
+  var doc = await loadPdf(file);
+  var pages = getPageNumbers(doc, opts.pageRange);
+  var wb = XLSX.utils.book_new();
+
+  for (var i = 0; i < pages.length; i++) {
+    var pageNum = pages[i];
+    var page = await doc.getPage(pageNum);
+    var content = await page.getTextContent();
+
+    // 依 Y 座標分行，依 X 座標排欄
+    var rowMap = {};
+    content.items.forEach(function(item) {
+      var y = Math.round(item.transform[5] / 5) * 5; // 5px 容差
+      var x = Math.round(item.transform[4] / 50);   // 每 50px 為一欄
+      if (!rowMap[y]) rowMap[y] = {};
+      rowMap[y][x] = (rowMap[y][x] || '') + item.str;
+    });
+
+    var rows = Object.keys(rowMap).sort(function(a,b){return b-a;}).map(function(y) {
+      var cols = rowMap[y];
+      var maxX = Math.max.apply(null, Object.keys(cols).map(Number));
+      var row = [];
+      for (var x = 0; x <= maxX; x++) row.push(cols[x] || '');
+      return row;
+    });
+
+    var sheetName = 'Page' + pageNum;
+    var ws = XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+    if (opts.onProgress) opts.onProgress(Math.round((i + 1) / pages.length * 100));
+  }
+
+  var buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Blob([buf], { type: getMime('xlsx') });
+}
+
+/* ════════════════════════════════
+   6. PDF → HTML
+   ════════════════════════════════ */
+/**
+ * @param {File} file
+ * @param {{pageRange:string, onProgress:function}} opts
+ * @returns {Promise<Blob>}
+ */
+async function convertToHtml(file, opts) {
+  opts = opts || {};
+  var doc = await loadPdf(file);
+  var pages = getPageNumbers(doc, opts.pageRange);
+  var sections = [];
+
+  for (var i = 0; i < pages.length; i++) {
+    var pageNum = pages[i];
+    var page = await doc.getPage(pageNum);
+    var content = await page.getTextContent();
+    var lines = {};
+    content.items.forEach(function(item) {
+      var y = Math.round(item.transform[5]);
+      if (!lines[y]) lines[y] = [];
+      lines[y].push(item.str);
+    });
+    var paras = Object.keys(lines).sort(function(a,b){return b-a;}).map(function(y) {
+      return '<p>' + lines[y].join(' ').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p>';
+    }).join('\n');
+
+    sections.push('<section class="pdf-page">' +
+      '<h2>第 ' + pageNum + ' 頁</h2>' + paras + '</section>');
+    if (opts.onProgress) opts.onProgress(Math.round((i + 1) / pages.length * 100));
+  }
+
+  var html = '<!DOCTYPE html><html lang="zh-TW"><head>' +
+    '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>' + getBaseName(file.name) + '</title>' +
+    '<style>body{font-family:Inter,sans-serif;max-width:900px;margin:0 auto;padding:2rem;color:#1A1F36;}' +
+    'h2{color:#FF6B00;border-bottom:2px solid #FFE0C8;padding-bottom:.3em;margin-top:2rem;}' +
+    'p{line-height:1.7;margin:.3em 0;}.pdf-page{margin-bottom:2rem;padding:1.5rem;' +
+    'border:1px solid #E5E7EB;border-radius:12px;}</style></head><body>' +
+    '<h1>' + getBaseName(file.name) + '</h1>' +
+    sections.join('\n') +
+    '<footer style="margin-top:3rem;padding-top:1rem;border-top:1px solid #E5E7EB;' +
+    'font-size:12px;color:#9CA3AF;text-align:center;">' +
+    'Converted by Sabre PDF Converter | Developed by Anderson | © 2026</footer>' +
+    '</body></html>';
+
+  return new Blob([html], { type: 'text/html;charset=utf-8' });
+}
+
+/* ════════════════════════════════
+   7. PDF → CSV
+   ════════════════════════════════ */
+/**
+ * @param {File} file
+ * @param {{pageRange:string, onProgress:function}} opts
+ * @returns {Promise<Blob>}
+ */
+async function convertToCsv(file, opts) {
+  opts = opts || {};
+  var doc = await loadPdf(file);
+  var pages = getPageNumbers(doc, opts.pageRange);
+  var allRows = [['Page', 'Line', 'Content']];
+
+  for (var i = 0; i < pages.length; i++) {
+    var pageNum = pages[i];
+    var page = await doc.getPage(pageNum);
+    var content = await page.getTextContent();
+    var lines = {};
+    content.items.forEach(function(item) {
+      var y = Math.round(item.transform[5]);
+      if (!lines[y]) lines[y] = [];
+      lines[y].push(item.str);
+    });
+
+    var lineIdx = 1;
+    Object.keys(lines).sort(function(a,b){return b-a;}).forEach(function(y) {
+      var text = lines[y].join(' ').replace(/"/g, '""');
+      allRows.push([pageNum, lineIdx++, '"' + text + '"']);
+    });
+
+    if (opts.onProgress) opts.onProgress(Math.round((i + 1) / pages.length * 100));
+  }
+
+  var csv = allRows.map(function(r) { return r.join(','); }).join('\r\n');
+  return new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }); // BOM for Excel
+}
+</script>

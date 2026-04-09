@@ -1,0 +1,17 @@
+# GAS / clasp
+.clasp.json
+
+# Environment
+.env
+*.env.*
+
+# Logs
+*.log
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

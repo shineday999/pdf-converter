@@ -1,0 +1,54 @@
+<style>
+/* ═══════════════════════════════════════
+   Sabre 2026 Brand — Light Theme Tokens
+   ═══════════════════════════════════════ */
+:root {
+  --sabre-orange:        #FF6B00;
+  --sabre-orange-hover:  #E55F00;
+  --sabre-orange-light:  #FFF3EB;
+  --sabre-orange-glow:   rgba(255,107,0,0.12);
+  --sabre-orange-border: rgba(255,107,0,0.35);
+
+  --sabre-bg:            #F4F6FB;
+  --sabre-surface:       #FFFFFF;
+  --sabre-surface-2:     #F8F9FC;
+  --sabre-navy:          #1A1F36;
+  --sabre-text:          #1A1F36;
+  --sabre-text-muted:    #6B7280;
+  --sabre-text-light:    #9CA3AF;
+
+  --sabre-success:       #10B981;
+  --sabre-success-bg:    #ECFDF5;
+  --sabre-error:         #EF4444;
+  --sabre-error-bg:      #FEF2F2;
+  --sabre-warning:       #F59E0B;
+
+  --sabre-border:        #E5E7EB;
+  --sabre-border-focus:  var(--sabre-orange);
+  --sabre-shadow-sm:     0 1px 4px rgba(0,0,0,0.06);
+  --sabre-shadow:        0 4px 20px rgba(0,0,0,0.08);
+  --sabre-shadow-lg:     0 8px 32px rgba(0,0,0,0.12);
+  --sabre-radius:        12px;
+  --sabre-radius-sm:     8px;
+  --sabre-radius-lg:     16px;
+  --font:                'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Layout heights */
+  --navbar-h:   52px;
+  --status-h:   34px;
+  --footer-h:   26px;
+  --content-h:  calc(100vh - var(--navbar-h) - var(--status-h) - var(--footer-h));
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font);
+  background: var(--sabre-bg);
+  color: var(--sabre-text);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+</style>

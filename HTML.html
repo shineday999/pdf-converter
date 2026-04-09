@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Sabre PDF Converter — 安全本機轉換 PDF 為多種格式，無需上傳檔案至伺服器">
+  <title>Sabre PDF Converter</title>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap 5.3 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+  <?!= include('StyleTheme') ?>
+  <?!= include('StyleLayout') ?>
+  <?!= include('StyleAnimation') ?>
+</head>
+<body>
+
+  <!-- ▸ Navbar -->
+  <nav class="sabre-navbar" id="mainNavbar">
+    <div class="navbar-brand-area">
+      <span class="navbar-compass">
+        <i class="bi bi-compass"></i>
+      </span>
+      <span class="navbar-title">Sabre <span class="navbar-title-sub">PDF Converter</span></span>
+    </div>
+    <div class="navbar-badge">
+      <i class="bi bi-shield-check me-1"></i>本機安全轉換 · 零上傳
+    </div>
+  </nav>
+
+  <!-- ▸ Main Layout -->
+  <main class="sabre-main" id="mainContent">
+    <div class="main-grid">
+
+      <!-- ══ 左側：上傳區 + 檔案清單 ══ -->
+      <div class="panel-left">
+
+        <!-- Dropzone -->
+        <div class="dropzone-wrapper">
+          <div class="dropzone" id="dropzone" role="button" tabindex="0"
+               aria-label="拖放 PDF 檔案或點擊選擇">
+            <input type="file" id="fileInput" accept=".pdf" multiple hidden>
+            <div class="dropzone-icon">
+              <i class="bi bi-file-earmark-arrow-up"></i>
+            </div>
+            <div class="dropzone-text">
+              <span class="dz-primary">拖放 PDF 檔案至此</span>
+              <span class="dz-secondary">或點擊選擇（支援多個檔案）</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 檔案清單 -->
+        <div class="file-list-section" id="fileListSection" style="display:none;">
+          <div class="file-list-header">
+            <span class="file-list-title">已選擇檔案</span>
+            <div class="file-list-actions">
+              <button class="btn-xs btn-outline-sabre" id="btnSelectAll">全選</button>
+              <button class="btn-xs btn-ghost" id="btnClearAll">清除全部</button>
+            </div>
+          </div>
+          <div class="file-list" id="fileList" role="list"></div>
+        </div>
+
+        <!-- 空白提示 -->
+        <div class="file-list-empty" id="fileListEmpty">
+          <i class="bi bi-arrow-up-circle"></i>
+          <span>尚未選擇任何檔案</span>
+        </div>
+
+      </div>
+
+      <!-- ══ 右側：設定 + 轉換 ══ -->
+      <div class="panel-right">
+
+        <!-- 格式選擇 -->
+        <div class="section-block">
+          <div class="section-label">
+            <i class="bi bi-file-earmark-arrow-right me-1"></i>輸出格式
+          </div>
+          <div class="format-grid" id="formatGrid" role="group" aria-label="選擇輸出格式">
+            <button class="format-card" data-format="txt" id="fmt-txt" aria-pressed="false">
+              <i class="bi bi-file-text"></i>
+              <span>TXT</span>
+            </button>
+            <button class="format-card" data-format="png" id="fmt-png" aria-pressed="false">
+              <i class="bi bi-file-image"></i>
+              <span>PNG</span>
+            </button>
+            <button class="format-card" data-format="jpg" id="fmt-jpg" aria-pressed="false">
+              <i class="bi bi-file-image"></i>
+              <span>JPG</span>
+            </button>
+            <button class="format-card" data-format="docx" id="fmt-docx" aria-pressed="false">
+              <i class="bi bi-file-word"></i>
+              <span>DOCX</span>
+            </button>
+            <button class="format-card" data-format="xlsx" id="fmt-xlsx" aria-pressed="false">
+              <i class="bi bi-file-excel"></i>
+              <span>XLSX</span>
+            </button>
+            <button class="format-card" data-format="html" id="fmt-html" aria-pressed="false">
+              <i class="bi bi-filetype-html"></i>
+              <span>HTML</span>
+            </button>
+            <button class="format-card" data-format="csv" id="fmt-csv" aria-pressed="false">
+              <i class="bi bi-filetype-csv"></i>
+              <span>CSV</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 圖片 DPI（PNG/JPG 選中時才顯示） -->
+        <div class="section-block dpi-section" id="dpiSection" style="display:none;">
+          <div class="section-label">
+            <i class="bi bi-image me-1"></i>圖片解析度
+          </div>
+          <div class="radio-group">
+            <label class="radio-option" id="dpi300Label">
+              <input type="radio" name="dpi" id="dpi300" value="300" checked>
+              <span class="radio-box">
+                <span class="radio-title">300 DPI</span>
+                <span class="radio-desc">高解析度・適合列印</span>
+              </span>
+            </label>
+            <label class="radio-option" id="dpi150Label">
+              <input type="radio" name="dpi" id="dpi150" value="150">
+              <span class="radio-box">
+                <span class="radio-title">150 DPI</span>
+                <span class="radio-desc">標準品質・檔案較小</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 頁碼範圍 -->
+        <div class="section-block">
+          <div class="section-label">
+            <i class="bi bi-bookmark me-1"></i>頁碼範圍
+          </div>
+          <div class="radio-group">
+            <label class="radio-option" id="pageAllLabel">
+              <input type="radio" name="pageRange" id="pageAll" value="all" checked>
+              <span class="radio-box">
+                <span class="radio-title">全部頁面</span>
+              </span>
+            </label>
+            <label class="radio-option" id="pageCustomLabel">
+              <input type="radio" name="pageRange" id="pageCustom" value="custom">
+              <span class="radio-box page-custom-box">
+                <span class="radio-title">自訂範圍</span>
+                <input type="text" class="page-range-input" id="pageRangeInput"
+                       placeholder="例：1-3, 5, 7-9"
+                       aria-label="頁碼範圍" disabled>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 收件人 Email -->
+        <div class="section-block">
+          <div class="section-label">
+            <i class="bi bi-envelope me-1"></i>寄送至 Email
+          </div>
+          <div class="email-input-wrap">
+            <i class="bi bi-envelope-at email-icon"></i>
+            <input type="email" class="email-input" id="recipientEmail"
+                   placeholder="recipient@example.com"
+                   aria-label="收件人 Email">
+          </div>
+        </div>
+
+        <!-- 轉換按鈕 -->
+        <button class="btn-convert" id="btnConvert" disabled aria-label="開始轉換並寄送 Email">
+          <i class="bi bi-rocket-takeoff me-2"></i>
+          <span>轉換並寄送 Email</span>
+        </button>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- ▸ Status Bar -->
+  <div class="status-bar" id="statusBar">
+    <span id="statusText">
+      <i class="bi bi-circle-fill status-dot status-ready"></i>
+      就緒
+    </span>
+    <span id="statusDetail" class="status-detail"></span>
+    <span class="status-security">
+      <i class="bi bi-shield-fill-check me-1"></i>本機轉換，安全無虞
+    </span>
+  </div>
+
+  <!-- ▸ Footer -->
+  <footer class="sabre-footer">
+    Developed by Anderson &nbsp;|&nbsp; v1.0.0 &nbsp;|&nbsp; 2026-04-09 &nbsp;|&nbsp; © 2026 All Rights Reserved
+  </footer>
+
+  <!-- ══════════════ Modals ══════════════ -->
+
+  <!-- 進度 Modal -->
+  <div class="modal fade" id="progressModal" data-bs-backdrop="static" data-bs-keyboard="false"
+       tabindex="-1" aria-labelledby="progressModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content sabre-modal">
+        <div class="modal-header sabre-modal-header">
+          <h5 class="modal-title" id="progressModalLabel">
+            <i class="bi bi-arrow-repeat spin me-2"></i>轉換處理中
+          </h5>
+        </div>
+        <div class="modal-body">
+          <div class="progress-file-name" id="progressFileName">準備中...</div>
+          <div class="progress-step" id="progressStep"></div>
+          <div class="progress mt-2" style="height:10px;border-radius:999px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                 id="progressBar" role="progressbar"
+                 style="width:0%;background:linear-gradient(90deg,#FF6B00,#FF8C38)">
+            </div>
+          </div>
+          <div class="progress-detail" id="progressDetail"></div>
+          <div class="progress-queue" id="progressQueue"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 結果 Modal -->
+  <div class="modal fade" id="resultModal" tabindex="-1"
+       aria-labelledby="resultModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content sabre-modal">
+        <div class="modal-header sabre-modal-header">
+          <h5 class="modal-title" id="resultModalLabel">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>轉換完成
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="關閉"></button>
+        </div>
+        <div class="modal-body" id="resultModalBody"></div>
+        <div class="modal-footer sabre-modal-footer">
+          <div class="result-email-info" id="resultEmailInfo"></div>
+          <button type="button" class="btn-convert-sm" id="btnConvertAnother"
+                  data-bs-dismiss="modal">
+            <i class="bi bi-arrow-repeat me-1"></i>繼續轉換
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 錯誤 Modal -->
+  <div class="modal fade" id="errorModal" tabindex="-1"
+       aria-labelledby="errorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content sabre-modal">
+        <div class="modal-header sabre-modal-header">
+          <h5 class="modal-title" id="errorModalLabel">
+            <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>發生錯誤
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="關閉"></button>
+        </div>
+        <div class="modal-body" id="errorModalBody"></div>
+        <div class="modal-footer sabre-modal-footer">
+          <button type="button" class="btn-ghost-md" data-bs-dismiss="modal">關閉</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ Scripts ══════════════ -->
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- pdf.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.mjs" type="module"></script>
+  <!-- docx -->
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js"></script>
+  <!-- SheetJS -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <!-- JSZip -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- FileSaver -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <?!= include('ScriptUtils') ?>
+  <?!= include('ScriptConverters') ?>
+  <?!= include('ScriptComponents') ?>
+  <?!= include('ScriptMain') ?>
+
+</body>
+</html>
