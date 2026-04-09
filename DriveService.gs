@@ -3,7 +3,7 @@
  * Google Drive API v3：建立輸出資料夾、存檔、取得分享連結
  */
 
-var ROOT_FOLDER_NAME = 'Sabre PDF Converter';
+var ROOT_FOLDER_NAME = 'PDF Converter';
 
 /**
  * 取得或建立根資料夾

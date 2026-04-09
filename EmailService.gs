@@ -3,7 +3,7 @@
  * 使用 GmailApp 寄送轉換結果 Email
  */
 
-var EMAIL_SUBJECT_PREFIX = '📄 Sabre PDF Converter — ';
+var EMAIL_SUBJECT_PREFIX = '📄 PDF Converter — ';
 var SMALL_FILE_LIMIT_BYTES = 20 * 1024 * 1024; // 20MB 以下直接附件
 
 /**
@@ -36,7 +36,7 @@ function sendConversionResult(recipientEmail, fileInfoArray, sourcePdfName, fold
     GmailApp.sendEmail(recipientEmail, subject, '', {
       htmlBody: body,
       attachments: attachments,
-      name: 'Sabre PDF Converter'
+      name: 'PDF Converter'
     });
 
     return { success: true, message: 'Email 已寄送至 ' + recipientEmail };
@@ -71,7 +71,7 @@ function buildEmailBody(fileInfoArray, sourcePdfName, folderUrl) {
   return '<!DOCTYPE html><html><body style="font-family:Inter,sans-serif;background:#F8F9FC;margin:0;padding:20px;">' +
     '<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">' +
       '<div style="background:#FF6B00;padding:24px 32px;">' +
-        '<h1 style="color:#fff;margin:0;font-size:20px;font-weight:700;">🧭 Sabre PDF Converter</h1>' +
+        '<h1 style="color:#fff;margin:0;font-size:20px;font-weight:700;">🧭 PDF Converter</h1>' +
         '<p style="color:rgba(255,255,255,0.85);margin:4px 0 0;font-size:14px;">轉換完成通知</p>' +
       '</div>' +
       '<div style="padding:28px 32px;">' +
@@ -91,7 +91,7 @@ function buildEmailBody(fileInfoArray, sourcePdfName, folderUrl) {
         '</div>' +
       '</div>' +
       '<div style="padding:16px 32px;background:#F8F9FC;border-top:1px solid #E5E7EB;text-align:center;">' +
-        '<p style="margin:0;font-size:12px;color:#6B7280;">Developed by Anderson &nbsp;|&nbsp; Sabre PDF Converter v1.0.0 &nbsp;|&nbsp; © 2026 All Rights Reserved</p>' +
+        '<p style="margin:0;font-size:12px;color:#6B7280;">Developed by Anderson &nbsp;|&nbsp; PDF Converter v1.0.0 &nbsp;|&nbsp; © 2026 All Rights Reserved</p>' +
       '</div>' +
     '</div>' +
   '</body></html>';

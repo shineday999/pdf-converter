@@ -1,4 +1,4 @@
-# Sabre PDF Converter
+# PDF Converter
 
 本機安全 PDF 多格式轉換工具，透過 Google Apps Script (GAS) 部署。
 
@@ -27,7 +27,7 @@
 clasp login
 
 # 建立新 GAS 專案（第一次）
-clasp create --type webapp --title "Sabre PDF Converter"
+clasp create --type webapp --title "PDF Converter"
 
 # 推送程式碼
 clasp push
