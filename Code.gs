@@ -7,9 +7,15 @@
  * Web App 入口
  */
 function doGet() {
-  return HtmlService.createTemplateFromFile('HTML')
-    .evaluate()
-    .setTitle('Sabre PDF Converter')
+  var template = HtmlService.createTemplateFromFile('HTML');
+  // 在伺服端取得使用者 Email，嵌入模板（頁面載入即可用，無需 async）
+  try {
+    template.userEmail = Session.getActiveUser().getEmail() || '';
+  } catch (e) {
+    template.userEmail = '';
+  }
+  return template.evaluate()
+    .setTitle('PDF Converter')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }

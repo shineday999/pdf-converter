@@ -359,14 +359,10 @@ function buildEmailInfo(emailResult, email) {
   initEmailInput();
   updateFileListVisibility();
 
-  // 預填收件人（從 GAS session 取得）
-  if (typeof google !== 'undefined' && google.script) {
-    google.script.run
-      .withSuccessHandler(function(email) {
-        if (email) document.getElementById('recipientEmail').value = email;
-        validateForm();
-      })
-      .getCurrentUserEmail();
+  // 預填收件人（GAS template 在 doGet() 已同步嵌入，無需 async）
+  if (typeof _USER_EMAIL !== 'undefined' && _USER_EMAIL) {
+    document.getElementById('recipientEmail').value = _USER_EMAIL;
   }
+  validateForm();
 })();
 </script>

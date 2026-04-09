@@ -19,6 +19,8 @@
   <?!= include('StyleTheme') ?>
   <?!= include('StyleLayout') ?>
   <?!= include('StyleAnimation') ?>
+  <!-- GAS template: embed user email at render time -->
+  <script>var _USER_EMAIL = '<?= userEmail ?>';</script>
 </head>
 <body>
 
@@ -173,6 +175,7 @@
             <i class="bi bi-envelope-at email-icon"></i>
             <input type="email" class="email-input" id="recipientEmail"
                    placeholder="recipient@example.com"
+                   value="<?= userEmail ?>"
                    aria-label="收件人 Email">
           </div>
         </div>

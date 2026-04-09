@@ -173,8 +173,8 @@ async function convertToDocx(file, opts) {
     sections: [{ properties: {}, children: children }]
   });
 
-  var buffer = await docx.Packer.toBuffer(wordDoc);
-  return new Blob([buffer], { type: getMime('docx') });
+  // toBlob() is browser-safe; toBuffer() requires Node.js and fails in browsers
+  return await docx.Packer.toBlob(wordDoc);
 }
 
 /* ════════════════════════════════
